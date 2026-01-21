@@ -1,0 +1,149 @@
+import * as vscode from 'vscode';
+
+/**
+ * Represents a parsed citation from a Markdown document
+ */
+export interface Citation {
+  /** The citation key (e.g., "author2023") */
+  key: string;
+  /** Full citation text as it appears in the document */
+  fullText: string;
+  /** Range in the document where this citation appears */
+  range: vscode.Range;
+  /** Optional page reference */
+  pageRef?: string;
+  /** Citation type */
+  type: 'bracket' | 'inline';
+}
+
+/**
+ * Represents a paragraph containing one or more citations
+ */
+export interface Paragraph {
+  /** The full paragraph text */
+  text: string;
+  /** Range in the document */
+  range: vscode.Range;
+  /** Citations found in this paragraph */
+  citations: Citation[];
+}
+
+/**
+ * Paper metadata from paper-index-tool CLI
+ */
+export interface Paper {
+  id: string;
+  title: string;
+  author: string;
+  year?: number;
+  abstract?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+  url?: string | null;
+  keywords?: string;
+  question?: string;
+  method?: string;
+  gaps?: string;
+  results?: string;
+  interpretation?: string;
+  claims?: string;
+  quotes?: Quote[];
+}
+
+/**
+ * Quote from a paper
+ */
+export interface Quote {
+  text: string;
+  page?: number;
+}
+
+/**
+ * Result from paper-index-tool CLI
+ */
+export interface PaperIndexResult {
+  paper?: Paper;
+  quotes?: Quote[];
+  error?: string;
+}
+
+/**
+ * Validation status levels
+ */
+export type ValidationStatus = 'supported' | 'partial' | 'not_supported';
+
+/**
+ * Result of validating a citation against paper content
+ */
+export interface ValidationResult {
+  /** The citation being validated */
+  citation: Citation;
+  /** Validation status */
+  status: ValidationStatus;
+  /** Confidence score (0-1) */
+  confidence: number;
+  /** Explanation from LLM */
+  explanation: string;
+  /** Supporting quotes found */
+  supportingQuotes?: Quote[];
+  /** The paragraph context */
+  paragraphText: string;
+  /** Paper metadata if found */
+  paper?: Paper;
+  /** Model ID used for validation */
+  modelId?: string;
+}
+
+/**
+ * Configuration for the extension
+ */
+export interface ExtensionConfig {
+  cliPath: string;
+  bedrock: {
+    region: string;
+    model: string;
+    profile?: string;
+  };
+  validateOnSave: boolean;
+  cache: {
+    ttlSeconds: number;
+  };
+  validation: {
+    confidenceThresholds: {
+      supported: number;
+      partial: number;
+    };
+  };
+}
+
+/**
+ * Cache entry with TTL support
+ */
+export interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+/**
+ * LLM validation request
+ */
+export interface ValidationRequest {
+  paragraphText: string;
+  citationKey: string;
+  paperTitle: string;
+  paperAbstract?: string;
+  quotes: Quote[];
+}
+
+/**
+ * LLM validation response
+ */
+export interface LLMValidationResponse {
+  status: ValidationStatus;
+  confidence: number;
+  explanation: string;
+  supportingQuoteIndices?: number[];
+}

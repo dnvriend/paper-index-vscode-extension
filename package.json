@@ -1,0 +1,177 @@
+{
+  "name": "paper-index-vscode-extension",
+  "displayName": "Paper Index Citation Validator",
+  "description": "Validate Pandoc citations in Markdown files against indexed academic sources",
+  "version": "0.1.0",
+  "publisher": "dennisvriend",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "pandoc",
+    "citation",
+    "markdown",
+    "academic",
+    "validation"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "paperIndex.validateCitations",
+        "title": "Paper Index: Validate Citations"
+      },
+      {
+        "command": "paperIndex.validateCurrentCitation",
+        "title": "Paper Index: Validate Current Citation"
+      },
+      {
+        "command": "paperIndex.clearCache",
+        "title": "Paper Index: Clear Cache"
+      }
+    ],
+    "configuration": {
+      "title": "Paper Index",
+      "properties": {
+        "paperIndex.cliPath": {
+          "type": "string",
+          "default": "paper-index-tool",
+          "description": "Path to paper-index-tool CLI executable",
+          "scope": "machine"
+        },
+        "paperIndex.bedrock.region": {
+          "type": "string",
+          "default": "us-east-1",
+          "enum": [
+            "us-east-1",
+            "us-west-2",
+            "eu-west-1",
+            "eu-west-2",
+            "eu-central-1",
+            "ap-southeast-1",
+            "ap-southeast-2",
+            "ap-northeast-1"
+          ],
+          "enumDescriptions": [
+            "US East (N. Virginia)",
+            "US West (Oregon)",
+            "Europe (Ireland)",
+            "Europe (London)",
+            "Europe (Frankfurt)",
+            "Asia Pacific (Singapore)",
+            "Asia Pacific (Sydney)",
+            "Asia Pacific (Tokyo)"
+          ],
+          "description": "AWS region for Amazon Bedrock API calls",
+          "scope": "machine"
+        },
+        "paperIndex.bedrock.model": {
+          "type": "string",
+          "default": "global.anthropic.claude-sonnet-4-20250514-v1:0",
+          "enum": [
+            "global.anthropic.claude-opus-4-5-20251101-v1:0",
+            "global.anthropic.claude-sonnet-4-20250514-v1:0",
+            "global.anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "global.anthropic.claude-3-5-haiku-20241022-v1:0",
+            "anthropic.claude-sonnet-4-20250514-v1:0",
+            "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "anthropic.claude-3-5-haiku-20241022-v1:0",
+            "anthropic.claude-3-haiku-20240307-v1:0"
+          ],
+          "enumDescriptions": [
+            "Claude Opus 4.5 - Global Inference Profile (most capable)",
+            "Claude Sonnet 4 - Global Inference Profile (recommended)",
+            "Claude 3.5 Sonnet v2 - Global Inference Profile",
+            "Claude 3.5 Haiku - Global Inference Profile (faster)",
+            "Claude Sonnet 4 - Direct model",
+            "Claude 3.5 Sonnet v2 - Direct model",
+            "Claude 3.5 Haiku - Direct model",
+            "Claude 3 Haiku - Direct model (fastest)"
+          ],
+          "markdownDescription": "Bedrock model ID. Use `global.*` prefix for inference profiles (ARN auto-constructed with account ID from profile). Direct model IDs use the model directly.",
+          "scope": "machine"
+        },
+        "paperIndex.bedrock.profile": {
+          "type": "string",
+          "default": "",
+          "description": "AWS profile name from ~/.aws/credentials (leave empty to use default credentials chain)",
+          "scope": "machine"
+        },
+        "paperIndex.validateOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically validate all citations when saving a Markdown file",
+          "scope": "resource"
+        },
+        "paperIndex.cache.ttlSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "Time-to-live for cached validation results in seconds (0 to disable caching)",
+          "scope": "window"
+        },
+        "paperIndex.validation.confidenceThresholds": {
+          "type": "object",
+          "default": {
+            "supported": 0.8,
+            "partial": 0.4
+          },
+          "properties": {
+            "supported": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum confidence for 'supported' status"
+            },
+            "partial": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Minimum confidence for 'partial' status"
+            }
+          },
+          "description": "Confidence thresholds for validation status (0.0 to 1.0)",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "compile-tests": "tsc -p . --outDir out",
+    "pretest:e2e": "npm run compile-tests",
+    "test:e2e": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.500.0",
+    "@aws-sdk/client-sts": "^3.500.0",
+    "@aws-sdk/credential-providers": "^3.500.0"
+  }
+}
