@@ -7,6 +7,7 @@ import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
 import { fromIni } from '@aws-sdk/credential-providers';
 import { ValidationRequest, LLMValidationResponse, TokenUsage } from '../types';
 import { buildValidationPrompt, parseValidationResponse } from '../validation/promptBuilder';
+import { logger } from './logger';
 
 /**
  * Service for interacting with AWS Bedrock Claude
@@ -129,10 +130,10 @@ export class BedrockService {
     const resolvedModelId = await this.resolveModelId();
 
     // Debug: Log the prompt being sent
-    console.log('=== BEDROCK REQUEST ===');
-    console.log('Model:', resolvedModelId);
-    console.log('Prompt:\n', prompt);
-    console.log('=== END PROMPT ===');
+    logger.debug('=== BEDROCK REQUEST ===');
+    logger.debug('Model:', resolvedModelId);
+    logger.debug('Prompt:', prompt);
+    logger.debug('=== END PROMPT ===');
 
     const body = JSON.stringify({
       anthropic_version: 'bedrock-2023-05-31',
@@ -159,9 +160,9 @@ export class BedrockService {
     const parsed = JSON.parse(responseBody);
 
     // Debug: Log the raw response
-    console.log('=== BEDROCK RESPONSE ===');
-    console.log('Raw JSON:', responseBody);
-    console.log('=== END RESPONSE ===');
+    logger.debug('=== BEDROCK RESPONSE ===');
+    logger.debug('Raw JSON:', responseBody);
+    logger.debug('=== END RESPONSE ===');
 
     // Extract token usage from response
     let tokenUsage: TokenUsage | undefined;
@@ -170,17 +171,13 @@ export class BedrockService {
         inputTokens: parsed.usage.input_tokens || 0,
         outputTokens: parsed.usage.output_tokens || 0,
       };
-      console.log('=== TOKEN USAGE ===');
-      console.log(`Input: ${tokenUsage.inputTokens}, Output: ${tokenUsage.outputTokens}`);
-      console.log('=== END TOKEN USAGE ===');
+      logger.info(`Token usage - Input: ${tokenUsage.inputTokens}, Output: ${tokenUsage.outputTokens}`);
     }
 
     // Extract content from Claude's response format
     if (parsed.content && Array.isArray(parsed.content) && parsed.content.length > 0) {
       const text = parsed.content[0].text;
-      console.log('=== EXTRACTED TEXT ===');
-      console.log(text);
-      console.log('=== END EXTRACTED ===');
+      logger.debug('Extracted response:', text);
       return { text, tokenUsage };
     }
 

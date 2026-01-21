@@ -1,4 +1,4 @@
-import { Quote, ValidationRequest } from '../types';
+import { Quote, ValidationRequest, Fragment } from '../types';
 
 /**
  * Build the validation prompt for Claude
@@ -9,6 +9,36 @@ export function buildValidationPrompt(request: ValidationRequest): string {
     ? `\n## Full Source Content\nThe complete source document is provided below for thorough validation:\n\n${request.fileContent}\n`
     : '';
 
+  // Build paper metadata section
+  const metadataLines: string[] = [];
+  metadataLines.push(`Title: ${request.paperTitle}`);
+  if (request.paperAuthor) {
+    metadataLines.push(`Author: ${request.paperAuthor}`);
+  }
+  if (request.paperYear) {
+    metadataLines.push(`Year: ${request.paperYear}`);
+  }
+  if (request.paperJournal) {
+    metadataLines.push(`Journal: ${request.paperJournal}`);
+  }
+  if (request.paperDoi) {
+    metadataLines.push(`DOI: ${request.paperDoi}`);
+  }
+  if (request.paperPeerReviewed !== undefined) {
+    metadataLines.push(`Peer Reviewed: ${request.paperPeerReviewed ? 'Yes' : 'No'}`);
+  }
+
+  // Build extended evidence sections
+  const abstractSection = request.paperAbstract ? `\n### Abstract\n${request.paperAbstract}\n` : '';
+  const questionSection = request.paperQuestion ? `\n### Research Question\n${request.paperQuestion}\n` : '';
+  const methodSection = request.paperMethod ? `\n### Method\n${request.paperMethod}\n` : '';
+  const resultsSection = request.paperResults ? `\n### Results\n${request.paperResults}\n` : '';
+  const interpretationSection = request.paperInterpretation ? `\n### Interpretation\n${request.paperInterpretation}\n` : '';
+  const claimsSection = request.paperClaims ? `\n### Key Claims\n${request.paperClaims}\n` : '';
+
+  // Build keyword fragments section
+  const fragmentsSection = formatFragments(request.keywordFragments);
+
   return `You are a strict academic citation validator. Your task is to determine if a cited paper supports the claims made about it.
 
 ## Citation to Validate
@@ -18,9 +48,13 @@ Paper: "${request.paperTitle}" (citation key: @${request.citationKey})
 ${request.paragraphText}
 
 ## Evidence from the Paper
-Title: ${request.paperTitle}
-${request.paperAbstract ? `Abstract: ${request.paperAbstract}\n` : ''}
-${quotesSection ? `Indexed Quotes:\n${quotesSection}` : 'No quotes indexed for this paper.'}${fileContentSection}
+
+### Metadata
+${metadataLines.join('\n')}
+${abstractSection}${questionSection}${methodSection}${resultsSection}${interpretationSection}${claimsSection}
+### Indexed Quotes
+${quotesSection || 'No quotes indexed for this paper.'}
+${fragmentsSection}${fileContentSection}
 
 ## Validation Process
 
@@ -85,6 +119,29 @@ function formatQuotes(quotes: Quote[]): string {
 "${quote.text}"`;
     })
     .join('\n\n');
+}
+
+/**
+ * Format keyword search fragments for the prompt
+ */
+function formatFragments(fragments?: Fragment[]): string {
+  if (!fragments || fragments.length === 0) {
+    return '';
+  }
+
+  const formattedFragments = fragments
+    .map((fragment, index) => {
+      const text = fragment.lines.join('\n');
+      return `[Fragment ${index + 1}] (lines ${fragment.line_start}-${fragment.line_end})
+${text}`;
+    })
+    .join('\n\n');
+
+  return `\n### Keyword Search Fragments (from full text)
+The following text fragments were found by searching the paper for keywords related to the claim:
+
+${formattedFragments}
+`;
 }
 
 /**

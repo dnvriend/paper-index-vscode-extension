@@ -1,9 +1,23 @@
 import { spawn } from 'child_process';
 import { readFile } from 'fs/promises';
-import { Paper, Quote, PaperIndexResult } from '../types';
+import { Paper, Quote, PaperIndexResult, Fragment, SearchResult } from '../types';
 import { getCacheService } from './cacheService';
+import { logger } from './logger';
 
 const COMMAND_TIMEOUT_MS = 30000;
+
+/**
+ * Simple hash for cache key generation
+ */
+function hashText(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
 
 /** Entry types supported by paper-index-tool */
 type EntryType = 'paper' | 'book' | 'media';
@@ -51,7 +65,7 @@ export class PaperIndexService {
       }
     }
 
-    console.error(`Entry not found in paper, book, or media: ${entryId}`);
+    logger.warn(`Entry not found in paper, book, or media: ${entryId}`);
     return undefined;
   }
 
@@ -81,7 +95,7 @@ export class PaperIndexService {
       }
     }
 
-    console.error(`Quotes not found for entry: ${entryId}`);
+    logger.warn(`Quotes not found for entry: ${entryId}`);
     return [];
   }
 
@@ -128,7 +142,7 @@ export class PaperIndexService {
       cache.set(cacheKey, content);
       return content;
     } catch (error) {
-      console.error(`Failed to read markdown file for ${entryId}:`, error);
+      logger.error(`Failed to read markdown file for ${entryId}:`, error);
       return undefined;
     }
   }
@@ -151,9 +165,132 @@ export class PaperIndexService {
       cache.set(cacheKey, papers);
       return papers;
     } catch (error) {
-      console.error(`Failed to search papers with query "${query}":`, error);
+      logger.error(`Failed to search papers with query "${query}":`, error);
       return [];
     }
+  }
+
+  /**
+   * Query a specific paper/book/media for keyword matches and return fragments
+   */
+  async queryEntry(entryId: string, keyword: string): Promise<Fragment[]> {
+    const cacheKey = `query:${entryId}:${keyword}`;
+    const cache = getCacheService();
+
+    const cached = cache.get<Fragment[]>(cacheKey);
+    if (cached) {
+      logger.debug(`Cache hit for query: ${entryId} "${keyword}"`);
+      return cached;
+    }
+
+    logger.info(`Querying ${entryId} for keyword: "${keyword}"`);
+
+    // Try each entry type until we find a match
+    for (const entryType of ENTRY_TYPES) {
+      try {
+        const result = await this.executeCommand([
+          entryType,
+          'query',
+          entryId,
+          keyword,
+          '--fragments',
+          '--format',
+          'json',
+        ]);
+        const searchResults = JSON.parse(result) as SearchResult[];
+        if (searchResults.length > 0 && searchResults[0].fragments) {
+          const fragments = searchResults[0].fragments;
+          logger.info(`Found ${fragments.length} fragment(s) for "${keyword}" in ${entryId}`);
+          cache.set(cacheKey, fragments);
+          return fragments;
+        }
+      } catch {
+        // Entry not found in this type, try next
+        continue;
+      }
+    }
+
+    logger.debug(`No fragments found for "${keyword}" in ${entryId}`);
+    return [];
+  }
+
+  /**
+   * Query a paper with multiple keywords and combine unique fragments
+   */
+  async queryEntryWithKeywords(entryId: string, keywords: string[]): Promise<Fragment[]> {
+    if (keywords.length === 0) {
+      return [];
+    }
+
+    logger.info(`Querying ${entryId} with ${keywords.length} keywords:`, keywords);
+
+    // Query all keywords in parallel
+    const fragmentArrays = await Promise.all(
+      keywords.map((keyword) => this.queryEntry(entryId, keyword))
+    );
+
+    // Combine and deduplicate fragments by line_start
+    const seenLineStarts = new Set<number>();
+    const uniqueFragments: Fragment[] = [];
+
+    for (const fragments of fragmentArrays) {
+      for (const fragment of fragments) {
+        if (!seenLineStarts.has(fragment.line_start)) {
+          seenLineStarts.add(fragment.line_start);
+          uniqueFragments.push(fragment);
+        }
+      }
+    }
+
+    // Sort by line_start for consistent ordering
+    uniqueFragments.sort((a, b) => a.line_start - b.line_start);
+
+    logger.info(`Combined ${uniqueFragments.length} unique fragment(s) for ${entryId}`);
+
+    return uniqueFragments;
+  }
+
+  /**
+   * Semantic search: query a paper with full paragraph text using vector embeddings
+   */
+  async semanticQueryEntry(entryId: string, paragraphText: string, contextLines: number = 3): Promise<Fragment[]> {
+    const cacheKey = `semantic:${entryId}:${hashText(paragraphText)}`;
+    const cache = getCacheService();
+
+    const cached = cache.get<Fragment[]>(cacheKey);
+    if (cached) {
+      logger.debug(`Cache hit for semantic query: ${entryId}`);
+      return cached;
+    }
+
+    logger.info(`Semantic search on ${entryId} with paragraph (${paragraphText.length} chars)`);
+
+    try {
+      const result = await this.executeCommand([
+        'query',
+        paragraphText,
+        '--paper',
+        entryId,
+        '-s',
+        '--fragments',
+        '-C',
+        contextLines.toString(),
+        '--format',
+        'json',
+      ]);
+      const searchResults = JSON.parse(result) as SearchResult[];
+      if (searchResults.length > 0 && searchResults[0].fragments) {
+        const fragments = searchResults[0].fragments;
+        logger.info(`Semantic search found ${fragments.length} fragment(s) for ${entryId}`);
+        cache.set(cacheKey, fragments);
+        return fragments;
+      }
+    } catch (error) {
+      logger.error(`Semantic search failed for ${entryId}:`, error);
+    }
+
+    logger.debug(`No semantic fragments found for ${entryId}`);
+    return [];
   }
 
   /**
@@ -172,6 +309,9 @@ export class PaperIndexService {
    * Execute a CLI command
    */
   private executeCommand(args: string[]): Promise<string> {
+    const commandStr = `${this.cliPath} ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`;
+    logger.debug(`Executing: ${commandStr}`);
+
     return new Promise((resolve, reject) => {
       const process = spawn(this.cliPath, args, {
         timeout: COMMAND_TIMEOUT_MS,
@@ -190,13 +330,17 @@ export class PaperIndexService {
 
       process.on('close', (code) => {
         if (code === 0) {
+          logger.debug(`Command succeeded, output length: ${stdout.length} chars`);
           resolve(stdout.trim());
         } else {
+          logger.error(`Command failed with code ${code}`);
+          logger.error(`stderr: ${stderr}`);
           reject(new Error(`CLI command failed with code ${code}: ${stderr}`));
         }
       });
 
       process.on('error', (error) => {
+        logger.error(`Command spawn error:`, error);
         reject(error);
       });
     });

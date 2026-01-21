@@ -51,6 +51,7 @@ export interface Paper {
   interpretation?: string;
   claims?: string;
   quotes?: Quote[];
+  peer_reviewed?: boolean;
 }
 
 /**
@@ -59,6 +60,27 @@ export interface Paper {
 export interface Quote {
   text: string;
   page?: number;
+}
+
+/**
+ * Fragment from BM25 search query
+ */
+export interface Fragment {
+  line_start: number;
+  line_end: number;
+  lines: string[];
+  matched_line_numbers: number[];
+}
+
+/**
+ * Search result with fragments
+ */
+export interface SearchResult {
+  id: string;
+  type: string;
+  score: number;
+  title: string;
+  fragments: Fragment[];
 }
 
 /**
@@ -144,6 +166,19 @@ export interface ValidationRequest {
   quotes: Quote[];
   /** Full file content (e.g., chapter markdown) when citation has page reference */
   fileContent?: string;
+  /** Extended paper metadata for richer context */
+  paperAuthor?: string;
+  paperYear?: number;
+  paperDoi?: string;
+  paperJournal?: string;
+  paperPeerReviewed?: boolean;
+  paperClaims?: string;
+  paperMethod?: string;
+  paperResults?: string;
+  paperQuestion?: string;
+  paperInterpretation?: string;
+  /** Keyword search fragments from BM25 query */
+  keywordFragments?: Fragment[];
 }
 
 /**

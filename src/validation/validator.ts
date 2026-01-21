@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
-import { Citation, Paragraph, ValidationResult, Quote, TokenUsage } from '../types';
+import { Citation, Paragraph, ValidationResult, Quote, TokenUsage, Fragment } from '../types';
 import { getPaperIndexService } from '../services/paperIndexService';
 import { getBedrockService } from '../services/bedrockService';
 import { getCacheService } from '../services/cacheService';
 import { getConfig } from '../config/settings';
+import { getKeywordExtractor } from '../services/keywordExtractor';
+import { logger } from '../services/logger';
 
 /**
  * Model pricing per million tokens (USD)
@@ -59,9 +61,16 @@ export class Validator {
       return cached;
     }
 
-    // Get paper data
     const paperIndexService = getPaperIndexService(config.cliPath);
-    const { paper, quotes, error } = await paperIndexService.getPaperWithQuotes(citation.key);
+    const keywordExtractor = getKeywordExtractor(config.bedrock.region, config.bedrock.profile);
+
+    // Run paper fetch and keyword extraction in parallel
+    const [paperResult, extractedKeywords] = await Promise.all([
+      paperIndexService.getPaperWithQuotes(citation.key),
+      keywordExtractor.extractKeywords(paragraph.text),
+    ]);
+
+    const { paper, quotes, error } = paperResult;
 
     if (error || !paper) {
       const result: ValidationResult = {
@@ -74,11 +83,33 @@ export class Validator {
       return result;
     }
 
-    // Fetch full file content when citation has page reference
-    let fileContent: string | undefined;
-    if (citation.pageRef) {
-      fileContent = await paperIndexService.getFileContent(citation.key);
+    // Combine English and Dutch keywords
+    const allKeywords = [...extractedKeywords.english, ...extractedKeywords.dutch];
+
+    // Fetch file content, keyword fragments, and semantic fragments in parallel
+    const [fileContent, keywordFragments, semanticFragments] = await Promise.all([
+      citation.pageRef ? paperIndexService.getFileContent(citation.key) : Promise.resolve(undefined),
+      allKeywords.length > 0
+        ? paperIndexService.queryEntryWithKeywords(citation.key, allKeywords)
+        : Promise.resolve([] as Fragment[]),
+      paperIndexService.semanticQueryEntry(citation.key, paragraph.text),
+    ]);
+
+    // Combine and deduplicate keyword + semantic fragments by line_start
+    const seenLineStarts = new Set<number>();
+    const combinedFragments: Fragment[] = [];
+
+    for (const fragment of [...keywordFragments, ...semanticFragments]) {
+      if (!seenLineStarts.has(fragment.line_start)) {
+        seenLineStarts.add(fragment.line_start);
+        combinedFragments.push(fragment);
+      }
     }
+
+    // Sort by line_start for consistent ordering
+    combinedFragments.sort((a, b) => a.line_start - b.line_start);
+
+    logger.info(`Combined ${combinedFragments.length} unique fragments (${keywordFragments.length} keyword + ${semanticFragments.length} semantic) for ${citation.key}`);
 
     // Validate with LLM
     const bedrockService = getBedrockService(
@@ -95,6 +126,18 @@ export class Validator {
         paperAbstract: paper.abstract,
         quotes: quotes || [],
         fileContent,
+        // Extended metadata
+        paperAuthor: paper.author,
+        paperYear: paper.year,
+        paperDoi: paper.doi,
+        paperJournal: paper.journal,
+        paperPeerReviewed: paper.peer_reviewed,
+        paperClaims: paper.claims,
+        paperMethod: paper.method,
+        paperResults: paper.results,
+        paperQuestion: paper.question,
+        paperInterpretation: paper.interpretation,
+        keywordFragments: combinedFragments,
       });
 
       // Map supporting quote indices (1-based) to actual quotes

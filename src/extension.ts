@@ -5,6 +5,7 @@ import { parseParagraphs, associateCitationsWithParagraphs } from './parsers/par
 import { getPaperIndexService } from './services/paperIndexService';
 import { getBedrockService } from './services/bedrockService';
 import { getCacheService } from './services/cacheService';
+import { logger } from './services/logger';
 import { getValidator } from './validation/validator';
 import { DiagnosticsProvider } from './providers/diagnosticsProvider';
 import { DecorationsProvider } from './providers/decorationsProvider';
@@ -66,8 +67,8 @@ function getStoredResults(documentUri: string): ValidationResult[] | undefined {
   const key = STORAGE_KEY_PREFIX + documentUri;
   const stored = extensionContext.workspaceState.get<SerializedValidationResult[]>(key);
 
-  console.log(`Paper Index: Looking for stored results with key: ${key}`);
-  console.log(`Paper Index: Found ${stored?.length ?? 0} stored results`);
+  logger.debug(`Looking for stored results with key: ${key}`);
+  logger.debug(`Found ${stored?.length ?? 0} stored results`);
 
   if (!stored || stored.length === 0) {
     return undefined;
@@ -99,11 +100,13 @@ async function storeResults(documentUri: string, results: ValidationResult[]): P
   }));
 
   await extensionContext.workspaceState.update(key, serialized);
-  console.log(`Paper Index: Stored ${results.length} results for ${documentUri}`);
+  logger.debug(`Stored ${results.length} results for ${documentUri}`);
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  console.log('Paper Index extension activating...');
+  // Initialize logger first so all services can use it
+  logger.initialize(context);
+  logger.info('Paper Index extension activating...');
 
   // Store context for persistence
   extensionContext = context;
@@ -216,12 +219,12 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  console.log('Paper Index extension activated');
+  logger.info('Paper Index extension activated');
 }
 
 export function deactivate(): void {
   getCacheService().clear();
-  console.log('Paper Index extension deactivated');
+  logger.info('Paper Index extension deactivated');
 }
 
 /**
