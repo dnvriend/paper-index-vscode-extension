@@ -18,9 +18,95 @@ let decorationsProvider: DecorationsProvider;
 let codeLensProvider: CodeLensProvider;
 let hoverProvider: HoverProvider;
 let codeActionsProvider: CodeActionsProvider;
+let extensionContext: vscode.ExtensionContext;
+
+// Storage key prefix for validation results
+const STORAGE_KEY_PREFIX = 'validationResults:';
+
+/**
+ * Serialized range for JSON storage
+ */
+interface SerializedRange {
+  startLine: number;
+  startChar: number;
+  endLine: number;
+  endChar: number;
+}
+
+/**
+ * Serialized validation result for storage
+ */
+interface SerializedValidationResult extends Omit<ValidationResult, 'citation'> {
+  citation: Omit<ValidationResult['citation'], 'range'> & { range: SerializedRange };
+}
+
+/**
+ * Convert vscode.Range to serializable object
+ */
+function serializeRange(range: vscode.Range): SerializedRange {
+  return {
+    startLine: range.start.line,
+    startChar: range.start.character,
+    endLine: range.end.line,
+    endChar: range.end.character,
+  };
+}
+
+/**
+ * Convert serialized range back to vscode.Range
+ */
+function deserializeRange(range: SerializedRange): vscode.Range {
+  return new vscode.Range(range.startLine, range.startChar, range.endLine, range.endChar);
+}
+
+/**
+ * Get stored validation results for a document
+ */
+function getStoredResults(documentUri: string): ValidationResult[] | undefined {
+  const key = STORAGE_KEY_PREFIX + documentUri;
+  const stored = extensionContext.workspaceState.get<SerializedValidationResult[]>(key);
+
+  console.log(`Paper Index: Looking for stored results with key: ${key}`);
+  console.log(`Paper Index: Found ${stored?.length ?? 0} stored results`);
+
+  if (!stored || stored.length === 0) {
+    return undefined;
+  }
+
+  // Deserialize ranges back to vscode.Range objects
+  return stored.map((result) => ({
+    ...result,
+    citation: {
+      ...result.citation,
+      range: deserializeRange(result.citation.range),
+    },
+  }));
+}
+
+/**
+ * Store validation results for a document
+ */
+async function storeResults(documentUri: string, results: ValidationResult[]): Promise<void> {
+  const key = STORAGE_KEY_PREFIX + documentUri;
+
+  // Serialize ranges for JSON storage
+  const serialized: SerializedValidationResult[] = results.map((result) => ({
+    ...result,
+    citation: {
+      ...result.citation,
+      range: serializeRange(result.citation.range),
+    },
+  }));
+
+  await extensionContext.workspaceState.update(key, serialized);
+  console.log(`Paper Index: Stored ${results.length} results for ${documentUri}`);
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('Paper Index extension activating...');
+
+  // Store context for persistence
+  extensionContext = context;
 
   // Initialize configuration
   const config = getConfig();
@@ -84,11 +170,25 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Listen for active editor changes
+  // Listen for active editor changes - restore decorations when switching tabs
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor && editor.document.languageId === 'markdown') {
         codeLensProvider.refresh();
+
+        // Restore validation results from storage
+        const documentUri = editor.document.uri.toString();
+        const storedResults = getStoredResults(documentUri);
+        if (storedResults && storedResults.length > 0) {
+          // Restore decorations
+          decorationsProvider.applyDecorations(editor, storedResults);
+          // Restore hover provider
+          hoverProvider.setValidationResults(documentUri, storedResults);
+          // Restore code actions provider
+          codeActionsProvider.setValidationResults(documentUri, storedResults);
+          // Update diagnostics
+          diagnosticsProvider.updateDiagnostics(editor.document, storedResults);
+        }
       }
     })
   );
@@ -101,6 +201,20 @@ export function activate(context: vscode.ExtensionContext): void {
     hoverProvider,
     codeActionsProvider
   );
+
+  // Restore validation results for currently open markdown editors
+  for (const editor of vscode.window.visibleTextEditors) {
+    if (editor.document.languageId === 'markdown') {
+      const documentUri = editor.document.uri.toString();
+      const storedResults = getStoredResults(documentUri);
+      if (storedResults && storedResults.length > 0) {
+        decorationsProvider.applyDecorations(editor, storedResults);
+        hoverProvider.setValidationResults(documentUri, storedResults);
+        codeActionsProvider.setValidationResults(documentUri, storedResults);
+        diagnosticsProvider.updateDiagnostics(editor.document, storedResults);
+      }
+    }
+  }
 
   console.log('Paper Index extension activated');
 }
@@ -149,11 +263,17 @@ async function validateAllCitations(): Promise<void> {
         return;
       }
 
-      applyValidationResults(document, results);
+      await applyValidationResults(document, results);
 
       const summary = summarizeResults(results);
+      const costStr =
+        summary.totalCostUsd > 0 ? ` | Cost: $${summary.totalCostUsd.toFixed(4)}` : '';
+      const tokensStr =
+        summary.totalInputTokens > 0
+          ? ` | Tokens: ${summary.totalInputTokens.toLocaleString()} in, ${summary.totalOutputTokens.toLocaleString()} out`
+          : '';
       vscode.window.showInformationMessage(
-        `Validation complete: ${summary.supported} supported, ${summary.partial} partial, ${summary.notSupported} not supported`
+        `Validation complete: ${summary.supported} supported, ${summary.partial} partial, ${summary.notSupported} not supported${costStr}${tokensStr}`
       );
     }
   );
@@ -212,7 +332,7 @@ async function validateCurrentCitation(citationKey?: string): Promise<void> {
         paragraphsWithCitations
       );
 
-      applyValidationResults(document, results, true);
+      await applyValidationResults(document, results, true);
 
       if (results.length > 0) {
         const result = results[0];
@@ -271,14 +391,19 @@ async function copyRephrase(rephrase: string): Promise<void> {
 /**
  * Apply validation results to the UI
  */
-function applyValidationResults(
+async function applyValidationResults(
   document: vscode.TextDocument,
   results: ValidationResult[],
-  merge: boolean = false
-): void {
+  _merge: boolean = false
+): Promise<void> {
   const editor = vscode.window.visibleTextEditors.find(
     (e) => e.document.uri.toString() === document.uri.toString()
   );
+
+  const documentUri = document.uri.toString();
+
+  // Persist results to workspace storage
+  await storeResults(documentUri, results);
 
   // Update diagnostics
   diagnosticsProvider.updateDiagnostics(document, results);
@@ -289,10 +414,10 @@ function applyValidationResults(
   }
 
   // Update hover provider
-  hoverProvider.setValidationResults(document.uri.toString(), results);
+  hoverProvider.setValidationResults(documentUri, results);
 
   // Update code actions provider
-  codeActionsProvider.setValidationResults(document.uri.toString(), results);
+  codeActionsProvider.setValidationResults(documentUri, results);
 
   // Refresh code lenses
   codeLensProvider.refresh();
@@ -305,11 +430,31 @@ function summarizeResults(results: ValidationResult[]): {
   supported: number;
   partial: number;
   notSupported: number;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
 } {
+  let totalCostUsd = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+
+  for (const result of results) {
+    if (result.costUsd) {
+      totalCostUsd += result.costUsd;
+    }
+    if (result.tokenUsage) {
+      totalInputTokens += result.tokenUsage.inputTokens;
+      totalOutputTokens += result.tokenUsage.outputTokens;
+    }
+  }
+
   return {
     supported: results.filter((r) => r.status === 'supported').length,
     partial: results.filter((r) => r.status === 'partial').length,
     notSupported: results.filter((r) => r.status === 'not_supported').length,
+    totalCostUsd,
+    totalInputTokens,
+    totalOutputTokens,
   };
 }
 

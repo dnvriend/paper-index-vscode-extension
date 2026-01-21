@@ -1,9 +1,45 @@
 import * as vscode from 'vscode';
-import { Citation, Paragraph, ValidationResult, Quote } from '../types';
+import { Citation, Paragraph, ValidationResult, Quote, TokenUsage } from '../types';
 import { getPaperIndexService } from '../services/paperIndexService';
 import { getBedrockService } from '../services/bedrockService';
 import { getCacheService } from '../services/cacheService';
 import { getConfig } from '../config/settings';
+
+/**
+ * Model pricing per million tokens (USD)
+ */
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // Opus
+  'claude-opus': { input: 5, output: 25 },
+  'anthropic.claude-opus': { input: 5, output: 25 },
+  // Sonnet
+  'claude-sonnet': { input: 3, output: 15 },
+  'anthropic.claude-sonnet': { input: 3, output: 15 },
+  // Haiku
+  'claude-haiku': { input: 1, output: 5 },
+  'anthropic.claude-haiku': { input: 1, output: 5 },
+};
+
+/**
+ * Calculate cost in USD based on token usage and model ID
+ */
+function calculateCost(tokenUsage: TokenUsage, modelId: string): number {
+  // Find matching pricing by checking if modelId contains the key
+  const modelIdLower = modelId.toLowerCase();
+  let pricing = { input: 3, output: 15 }; // Default to Sonnet pricing
+
+  for (const [key, value] of Object.entries(MODEL_PRICING)) {
+    if (modelIdLower.includes(key)) {
+      pricing = value;
+      break;
+    }
+  }
+
+  const inputCost = (tokenUsage.inputTokens / 1_000_000) * pricing.input;
+  const outputCost = (tokenUsage.outputTokens / 1_000_000) * pricing.output;
+
+  return inputCost + outputCost;
+}
 
 /**
  * Main validation orchestrator
@@ -38,6 +74,12 @@ export class Validator {
       return result;
     }
 
+    // Fetch full file content when citation has page reference
+    let fileContent: string | undefined;
+    if (citation.pageRef) {
+      fileContent = await paperIndexService.getFileContent(citation.key);
+    }
+
     // Validate with LLM
     const bedrockService = getBedrockService(
       config.bedrock.region,
@@ -52,6 +94,7 @@ export class Validator {
         paperTitle: paper.title,
         paperAbstract: paper.abstract,
         quotes: quotes || [],
+        fileContent,
       });
 
       // Map supporting quote indices (1-based) to actual quotes
@@ -59,6 +102,11 @@ export class Validator {
         ? llmResponse.supportingQuoteIndices
             .map((idx) => quotes?.[idx - 1])
             .filter((q): q is Quote => q !== undefined)
+        : undefined;
+
+      // Calculate cost if token usage is available
+      const costUsd = llmResponse.tokenUsage
+        ? calculateCost(llmResponse.tokenUsage, config.bedrock.model)
         : undefined;
 
       // Use the LLM's status directly - confidence represents how certain
@@ -73,6 +121,8 @@ export class Validator {
         paper,
         modelId: config.bedrock.model,
         rephrase: llmResponse.rephrase,
+        tokenUsage: llmResponse.tokenUsage,
+        costUsd,
       };
 
       cache.set(cacheKey, result);

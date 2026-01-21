@@ -118,6 +118,46 @@ describe('citationParser', () => {
       expect(citations).toHaveLength(1);
       expect(citations[0].pageRef).toBe('42-45');
     });
+
+    it('should parse citation with chapter suffix in key', () => {
+      const doc = createMockDocument(
+        'De oude *great man theory* suggereerde dat leiders geboren worden [@vogelgesang2023ch4, pp. 56-57].'
+      );
+      const citations = parseCitations(doc);
+
+      expect(citations).toHaveLength(1);
+      expect(citations[0].key).toBe('vogelgesang2023ch4');
+      expect(citations[0].pageRef).toBe('56-57');
+      expect(citations[0].type).toBe('bracket');
+    });
+
+    it('should parse single page reference with p.', () => {
+      const doc = createMockDocument(
+        'Lengte en uiterlijk creëren een *halo effect* [@vogelgesang2023ch4, p. 58].'
+      );
+      const citations = parseCitations(doc);
+
+      expect(citations).toHaveLength(1);
+      expect(citations[0].key).toBe('vogelgesang2023ch4');
+      expect(citations[0].pageRef).toBe('58');
+    });
+
+    it('should parse multiple citations in Dutch academic text', () => {
+      const doc = createMockDocument(
+        `Wat maakt iemand een goede leider? Het handboek laat zien dat dit geen eenvoudige vraag is. De oude *great man theory* suggereerde dat leiders geboren worden met speciale eigenschappen, maar hedendaags onderzoek toont aan dat de situatie grotendeels bepaalt welke eigenschappen effectief zijn [@vogelgesang2023ch4, pp. 56-57].
+
+Sommige eigenschappen zijn niet te veranderen: lengte en uiterlijk creëren een *halo effect* waardoor mensen als competenter worden gezien [@vogelgesang2023ch4, p. 58]. Andere eigenschappen zijn wel ontwikkelbaar: wijsheid en oordeelsvermogen groeien door reflectie en feedback van anderen [@vogelgesang2023ch4, pp. 61-62].`
+      );
+      const citations = parseCitations(doc);
+
+      expect(citations).toHaveLength(3);
+      expect(citations[0].key).toBe('vogelgesang2023ch4');
+      expect(citations[0].pageRef).toBe('56-57');
+      expect(citations[1].key).toBe('vogelgesang2023ch4');
+      expect(citations[1].pageRef).toBe('58');
+      expect(citations[2].key).toBe('vogelgesang2023ch4');
+      expect(citations[2].pageRef).toBe('61-62');
+    });
   });
 
   describe('getUniqueCitationKeys', () => {

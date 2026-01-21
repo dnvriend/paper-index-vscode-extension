@@ -97,6 +97,10 @@ export interface ValidationResult {
   modelId?: string;
   /** Suggested rephrase to improve confidence (only for supported/partial) */
   rephrase?: string;
+  /** Token usage from LLM call */
+  tokenUsage?: TokenUsage;
+  /** Estimated cost in USD */
+  costUsd?: number;
 }
 
 /**
@@ -138,6 +142,16 @@ export interface ValidationRequest {
   paperTitle: string;
   paperAbstract?: string;
   quotes: Quote[];
+  /** Full file content (e.g., chapter markdown) when citation has page reference */
+  fileContent?: string;
+}
+
+/**
+ * Token usage from LLM response
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
 }
 
 /**
@@ -150,4 +164,6 @@ export interface LLMValidationResponse {
   supportingQuoteIndices?: number[];
   /** Suggested rephrase to improve confidence (only for supported/partial) */
   rephrase?: string;
+  /** Token usage from the LLM call */
+  tokenUsage?: TokenUsage;
 }

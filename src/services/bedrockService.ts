@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
 import { fromIni } from '@aws-sdk/credential-providers';
-import { ValidationRequest, LLMValidationResponse } from '../types';
+import { ValidationRequest, LLMValidationResponse, TokenUsage } from '../types';
 import { buildValidationPrompt, parseValidationResponse } from '../validation/promptBuilder';
 
 /**
@@ -116,14 +116,15 @@ export class BedrockService {
   async validateCitation(request: ValidationRequest): Promise<LLMValidationResponse> {
     const prompt = buildValidationPrompt(request);
 
-    const response = await this.invokeModel(prompt);
-    return parseValidationResponse(response);
+    const { text, tokenUsage } = await this.invokeModel(prompt);
+    const response = parseValidationResponse(text);
+    return { ...response, tokenUsage };
   }
 
   /**
    * Invoke the Claude model
    */
-  private async invokeModel(prompt: string): Promise<string> {
+  private async invokeModel(prompt: string): Promise<{ text: string; tokenUsage?: TokenUsage }> {
     const client = this.getClient();
     const resolvedModelId = await this.resolveModelId();
 
@@ -162,13 +163,25 @@ export class BedrockService {
     console.log('Raw JSON:', responseBody);
     console.log('=== END RESPONSE ===');
 
+    // Extract token usage from response
+    let tokenUsage: TokenUsage | undefined;
+    if (parsed.usage) {
+      tokenUsage = {
+        inputTokens: parsed.usage.input_tokens || 0,
+        outputTokens: parsed.usage.output_tokens || 0,
+      };
+      console.log('=== TOKEN USAGE ===');
+      console.log(`Input: ${tokenUsage.inputTokens}, Output: ${tokenUsage.outputTokens}`);
+      console.log('=== END TOKEN USAGE ===');
+    }
+
     // Extract content from Claude's response format
     if (parsed.content && Array.isArray(parsed.content) && parsed.content.length > 0) {
       const text = parsed.content[0].text;
       console.log('=== EXTRACTED TEXT ===');
       console.log(text);
       console.log('=== END EXTRACTED ===');
-      return text;
+      return { text, tokenUsage };
     }
 
     throw new Error('Unexpected response format from Bedrock');

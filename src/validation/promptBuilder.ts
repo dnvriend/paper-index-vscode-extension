@@ -5,6 +5,9 @@ import { Quote, ValidationRequest } from '../types';
  */
 export function buildValidationPrompt(request: ValidationRequest): string {
   const quotesSection = formatQuotes(request.quotes);
+  const fileContentSection = request.fileContent
+    ? `\n## Full Source Content\nThe complete source document is provided below for thorough validation:\n\n${request.fileContent}\n`
+    : '';
 
   return `You are a strict academic citation validator. Your task is to determine if a cited paper supports the claims made about it.
 
@@ -17,7 +20,7 @@ ${request.paragraphText}
 ## Evidence from the Paper
 Title: ${request.paperTitle}
 ${request.paperAbstract ? `Abstract: ${request.paperAbstract}\n` : ''}
-${quotesSection ? `Indexed Quotes:\n${quotesSection}` : 'No quotes indexed for this paper.'}
+${quotesSection ? `Indexed Quotes:\n${quotesSection}` : 'No quotes indexed for this paper.'}${fileContentSection}
 
 ## Validation Process
 
