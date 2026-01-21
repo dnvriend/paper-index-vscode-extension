@@ -58,7 +58,8 @@ export function activate(context: vscode.ExtensionContext): void {
       validateCurrentCitation
     ),
     vscode.commands.registerCommand('paperIndex.clearCache', clearCache),
-    vscode.commands.registerCommand('paperIndex.searchPaper', searchPaper)
+    vscode.commands.registerCommand('paperIndex.searchPaper', searchPaper),
+    vscode.commands.registerCommand('paperIndex.copyRephrase', copyRephrase)
   );
 
   // Listen for configuration changes
@@ -257,6 +258,14 @@ async function searchPaper(query?: string): Promise<void> {
   } else {
     vscode.window.showWarningMessage(`Paper not found: ${query}`);
   }
+}
+
+/**
+ * Copy rephrase suggestion to clipboard
+ */
+async function copyRephrase(rephrase: string): Promise<void> {
+  await vscode.env.clipboard.writeText(rephrase);
+  vscode.window.showInformationMessage('Rephrase suggestion copied to clipboard.');
 }
 
 /**

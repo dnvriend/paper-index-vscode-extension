@@ -4,6 +4,10 @@
   "description": "Validate Pandoc citations in Markdown files against indexed academic sources",
   "version": "0.1.0",
   "publisher": "dennisvriend",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnvriend/paper-index-vscode-extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -35,6 +39,14 @@
       {
         "command": "paperIndex.clearCache",
         "title": "Paper Index: Clear Cache"
+      },
+      {
+        "command": "paperIndex.searchPaper",
+        "title": "Paper Index: Search Paper"
+      },
+      {
+        "command": "paperIndex.copyRephrase",
+        "title": "Paper Index: Copy Rephrase Suggestion"
       }
     ],
     "configuration": {

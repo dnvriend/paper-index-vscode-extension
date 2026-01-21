@@ -72,6 +72,7 @@ export class Validator {
         paragraphText: paragraph.text,
         paper,
         modelId: config.bedrock.model,
+        rephrase: llmResponse.rephrase,
       };
 
       cache.set(cacheKey, result);

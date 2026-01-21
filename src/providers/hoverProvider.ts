@@ -91,6 +91,15 @@ export class HoverProvider implements vscode.HoverProvider {
       }
     }
 
+    // Show rephrase suggestion for supported/partial (not for not_supported)
+    if (result.rephrase && result.status !== 'not_supported') {
+      md.appendMarkdown(`---\n\n`);
+      const rephraseIcon = result.status === 'partial' ? '💡' : '✨';
+      const rephraseLabel = result.status === 'partial' ? 'Suggested Rephrase' : 'Improve Confidence';
+      md.appendMarkdown(`**${rephraseIcon} ${rephraseLabel}:**\n\n`);
+      md.appendMarkdown(`> ${result.rephrase}\n\n`);
+    }
+
     // Show model used for validation
     if (result.modelId) {
       md.appendMarkdown(`---\n\n`);

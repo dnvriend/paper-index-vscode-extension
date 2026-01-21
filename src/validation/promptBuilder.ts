@@ -57,8 +57,14 @@ Return ONLY a JSON object:
   "status": "supported" | "partial" | "not_supported",
   "confidence": <number 0.0-1.0>,
   "explanation": "<your reasoning - if not_supported, explain why the paper doesn't match the claim>",
-  "supportingQuoteIndices": [<1-based quote indices that support the claim, empty array [] if none>]
-}`;
+  "supportingQuoteIndices": [<1-based quote indices that support the claim, empty array [] if none>],
+  "rephrase": "<ONLY for supported/partial: suggest how to rephrase the claim to achieve higher confidence or full support. Omit this field entirely for not_supported.>"
+}
+
+### Rephrase Guidelines
+- For **supported**: If confidence < 1.0, suggest minor refinements to make the claim more precise and boost confidence
+- For **partial**: Suggest how to rephrase the claim so it accurately reflects what the paper actually says, aiming for "supported" status
+- For **not_supported**: Do NOT include a rephrase field - the citation is simply wrong for this claim`;
 }
 
 /**
@@ -86,6 +92,7 @@ export function parseValidationResponse(response: string): {
   confidence: number;
   explanation: string;
   supportingQuoteIndices?: number[];
+  rephrase?: string;
 } {
   // Try to extract JSON from the response
   const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -114,5 +121,6 @@ export function parseValidationResponse(response: string): {
     confidence,
     explanation: parsed.explanation,
     supportingQuoteIndices: parsed.supportingQuoteIndices,
+    rephrase: parsed.rephrase,
   };
 }

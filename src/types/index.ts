@@ -95,6 +95,8 @@ export interface ValidationResult {
   paper?: Paper;
   /** Model ID used for validation */
   modelId?: string;
+  /** Suggested rephrase to improve confidence (only for supported/partial) */
+  rephrase?: string;
 }
 
 /**
@@ -146,4 +148,6 @@ export interface LLMValidationResponse {
   confidence: number;
   explanation: string;
   supportingQuoteIndices?: number[];
+  /** Suggested rephrase to improve confidence (only for supported/partial) */
+  rephrase?: string;
 }

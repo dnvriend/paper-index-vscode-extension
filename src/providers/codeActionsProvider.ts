@@ -88,6 +88,23 @@ export class CodeActionsProvider implements vscode.CodeActionProvider {
       }
     }
 
+    // If has rephrase suggestion (for supported/partial), offer to apply it
+    if (validationResult?.rephrase && validationResult.status !== 'not_supported') {
+      const rephraseLabel =
+        validationResult.status === 'partial'
+          ? 'Apply suggested rephrase (copy to clipboard)'
+          : 'Apply improved phrasing (copy to clipboard)';
+
+      const rephraseAction = new vscode.CodeAction(rephraseLabel, vscode.CodeActionKind.QuickFix);
+      rephraseAction.command = {
+        command: 'paperIndex.copyRephrase',
+        title: 'Copy Rephrase',
+        arguments: [validationResult.rephrase],
+      };
+      rephraseAction.isPreferred = validationResult.status === 'partial';
+      actions.push(rephraseAction);
+    }
+
     // If not supported, offer to check paper index
     if (validationResult?.status === 'not_supported') {
       const checkPaperAction = new vscode.CodeAction(
