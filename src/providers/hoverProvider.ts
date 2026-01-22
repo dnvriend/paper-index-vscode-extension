@@ -60,6 +60,7 @@ export class HoverProvider implements vscode.HoverProvider {
   private createValidatedHover(result: ValidationResult): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
     md.isTrusted = true;
+    md.supportHtml = true;
 
     const statusIcon = this.getStatusIcon(result.status);
     const confidence = Math.round(result.confidence * 100);
@@ -77,6 +78,28 @@ export class HoverProvider implements vscode.HoverProvider {
       if (result.paper.year) {
         md.appendMarkdown(`Year: ${result.paper.year}\n\n`);
       }
+      // Collapsible metadata sections
+      this.appendCollapsible(md, 'Abstract', result.paper.abstract);
+      this.appendCollapsible(md, 'Research Question', result.paper.question);
+      this.appendCollapsible(md, 'Method', result.paper.method);
+      this.appendCollapsible(md, 'Gaps', result.paper.gaps);
+      this.appendCollapsible(md, 'Results', result.paper.results);
+      this.appendCollapsible(md, 'Claims', result.paper.claims);
+
+      // Quotes section
+      if (result.paper.quotes?.length) {
+        const quotesContent = result.paper.quotes
+          .map((q) => `> "${q.text}"${q.page ? ` *(p. ${q.page})*` : ''}`)
+          .join('\n\n');
+        md.appendMarkdown(`<details><summary><strong>Quotes (${result.paper.quotes.length})</strong></summary>\n\n${quotesContent}\n\n</details>\n\n`);
+      } else {
+        this.appendCollapsible(md, 'Quotes', undefined);
+      }
+
+      // BibTeX section (generated from metadata) with copy button
+      const bibtex = this.generateBibtex(result.paper);
+      const copyCommand = `command:paperIndex.copyBibTeX?${encodeURIComponent(JSON.stringify([bibtex]))}`;
+      md.appendMarkdown(`<details><summary><strong>BibTeX</strong></summary>\n\n\`\`\`bibtex\n${bibtex}\n\`\`\`\n\n[📋 Copy to Clipboard](${copyCommand})\n\n</details>\n\n`);
     }
 
     if (result.supportingQuotes?.length) {
@@ -107,6 +130,57 @@ export class HoverProvider implements vscode.HoverProvider {
     }
 
     return md;
+  }
+
+  /**
+   * Append a collapsible section to markdown
+   */
+  private appendCollapsible(md: vscode.MarkdownString, label: string, content: string | undefined): void {
+    const displayContent = content ? `*${content}*` : `*No ${label.toLowerCase()} available*`;
+    md.appendMarkdown(`<details><summary><strong>${label}</strong></summary>\n\n${displayContent}\n\n</details>\n\n`);
+  }
+
+  /**
+   * Generate BibTeX entry from paper metadata
+   */
+  private generateBibtex(paper: import('../types').Paper): string {
+    const key = paper.id || 'unknown';
+    const lines = [`@article{${key},`];
+
+    if (paper.title) {
+      lines.push(`  title = {${paper.title}},`);
+    }
+    if (paper.author) {
+      lines.push(`  author = {${paper.author}},`);
+    }
+    if (paper.year) {
+      lines.push(`  year = {${paper.year}},`);
+    }
+    if (paper.journal) {
+      lines.push(`  journal = {${paper.journal}},`);
+    }
+    if (paper.volume) {
+      lines.push(`  volume = {${paper.volume}},`);
+    }
+    if (paper.issue) {
+      lines.push(`  number = {${paper.issue}},`);
+    }
+    if (paper.pages) {
+      lines.push(`  pages = {${paper.pages}},`);
+    }
+    if (paper.doi) {
+      lines.push(`  doi = {${paper.doi}},`);
+    }
+    if (paper.url) {
+      lines.push(`  url = {${paper.url}},`);
+    }
+
+    // Remove trailing comma from last line
+    const lastLine = lines[lines.length - 1];
+    lines[lines.length - 1] = lastLine.replace(/,$/, '');
+    lines.push('}');
+
+    return lines.join('\n');
   }
 
   /**

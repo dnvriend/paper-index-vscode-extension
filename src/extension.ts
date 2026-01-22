@@ -148,7 +148,8 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('paperIndex.clearCache', clearCache),
     vscode.commands.registerCommand('paperIndex.searchPaper', searchPaper),
-    vscode.commands.registerCommand('paperIndex.copyRephrase', copyRephrase)
+    vscode.commands.registerCommand('paperIndex.copyRephrase', copyRephrase),
+    vscode.commands.registerCommand('paperIndex.copyBibTeX', copyBibTeX)
   );
 
   // Listen for configuration changes
@@ -389,6 +390,14 @@ async function searchPaper(query?: string): Promise<void> {
 async function copyRephrase(rephrase: string): Promise<void> {
   await vscode.env.clipboard.writeText(rephrase);
   vscode.window.showInformationMessage('Rephrase suggestion copied to clipboard.');
+}
+
+/**
+ * Copy BibTeX to clipboard
+ */
+async function copyBibTeX(bibtex: string): Promise<void> {
+  await vscode.env.clipboard.writeText(bibtex);
+  vscode.window.showInformationMessage('BibTeX copied to clipboard.');
 }
 
 /**
