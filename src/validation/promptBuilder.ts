@@ -75,26 +75,47 @@ If the topic is relevant, actively search the quotes and abstract for evidence t
 - Look for indirect support or related concepts
 - Be generous in interpretation but honest about the strength of evidence
 
-### Step 3: Determine Final Status
+### Step 3: Determine Final Status (adjusted by source type)
 
-**Important**: Apply different confidence thresholds based on source type:
-- **paper** (peer-reviewed): Hold to highest standard (0.85+ for supported)
-- **book**: Moderate standard, broader interpretations acceptable (0.75+ for supported)
-- **media** (video/podcast/blog): Most lenient, illustrative use acceptable (0.60+ for supported)
+The source type affects how strictly you evaluate the claim:
 
-**"supported"** (confidence varies by source type) - ONLY if you found:
+**For paper (peer-reviewed)**: Strictest evaluation
+- Claim must closely match what the paper actually states
+- Confidence 0.85+ required for "supported"
+- Generalizations or interpretations beyond the data → partial
+
+**For book**: Moderate evaluation
+- Broader interpretations acceptable
+- Confidence 0.75+ required for "supported"
+- Author's opinions/frameworks can support claims about those frameworks
+
+**For media (video/podcast/blog)**: Most lenient evaluation
+- Illustrative use is acceptable ("X demonstrates..." or "X shows...")
+- Confidence 0.60+ required for "supported"
+- First-person statements from the subject are strong evidence
+- Example: Nadella saying "I believe in empathy" in an interview supports claims about his empathic leadership style
+
+### Claim Type Considerations
+- **Factual claim** ("X published Y in Z"): Requires exact match regardless of source type
+- **Illustrative claim** ("X demonstrates Y"): Source type thresholds apply
+- **Theoretical claim** ("Research shows X"): Requires academic source (paper/book)
+
+### Status Definitions
+
+**"supported"** - You found:
 - Direct quotes or abstract text that explicitly state what the paragraph claims
 - Clear, unambiguous evidence supporting the specific claim
+- Confidence threshold met for the source type
 
-**"partial"** - If you found:
-- The paper discusses related concepts but doesn't directly make the claimed argument
+**"partial"** - You found:
+- The source discusses related concepts but doesn't directly make the claimed argument
 - Some aspects of the claim are supported, others are not
 - The connection requires reasonable inference
 
 **"not_supported"** (confidence 0.0-0.39) - If:
-- The paper's topic is unrelated to the claim
-- No evidence connects the paper's content to what is claimed about it
-- The paragraph mischaracterizes what the paper is about
+- The source's topic is unrelated to the claim
+- No evidence connects the source's content to what is claimed about it
+- The paragraph mischaracterizes what the source is about
 
 ## Response Format
 Return ONLY a JSON object:
