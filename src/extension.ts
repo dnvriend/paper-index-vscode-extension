@@ -13,6 +13,7 @@ import { CodeLensProvider } from './providers/codeLensProvider';
 import { HoverProvider } from './providers/hoverProvider';
 import { CodeActionsProvider } from './providers/codeActionsProvider';
 import { ValidationResult } from './types';
+import { formatResultsAsMarkdown } from './utils/resultsFormatter';
 
 let diagnosticsProvider: DiagnosticsProvider;
 let decorationsProvider: DecorationsProvider;
@@ -149,7 +150,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('paperIndex.clearCache', clearCache),
     vscode.commands.registerCommand('paperIndex.searchPaper', searchPaper),
     vscode.commands.registerCommand('paperIndex.copyRephrase', copyRephrase),
-    vscode.commands.registerCommand('paperIndex.copyBibTeX', copyBibTeX)
+    vscode.commands.registerCommand('paperIndex.copyBibTeX', copyBibTeX),
+    vscode.commands.registerCommand('paperIndex.copyAllResults', copyAllResults)
   );
 
   // Listen for configuration changes
@@ -398,6 +400,42 @@ async function copyRephrase(rephrase: string): Promise<void> {
 async function copyBibTeX(bibtex: string): Promise<void> {
   await vscode.env.clipboard.writeText(bibtex);
   vscode.window.showInformationMessage('BibTeX copied to clipboard.');
+}
+
+/**
+ * Copy all validation results to clipboard as Markdown
+ */
+async function copyAllResults(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.languageId !== 'markdown') {
+    vscode.window.showWarningMessage('Please open a Markdown file to copy results.');
+    return;
+  }
+
+  const documentUri = editor.document.uri.toString();
+  const storedResults = getStoredResults(documentUri);
+
+  if (!storedResults || storedResults.length === 0) {
+    vscode.window.showWarningMessage(
+      'No validation results found. Run "Paper Index: Validate Citations" first.'
+    );
+    return;
+  }
+
+  // Sort results by document position (line number)
+  const sortedResults = [...storedResults].sort(
+    (a, b) => a.citation.range.start.line - b.citation.range.start.line
+  );
+
+  // Format as Markdown
+  const markdown = formatResultsAsMarkdown(sortedResults);
+
+  // Copy to clipboard
+  await vscode.env.clipboard.writeText(markdown);
+
+  vscode.window.showInformationMessage(
+    `Copied ${sortedResults.length} validation result(s) to clipboard.`
+  );
 }
 
 /**

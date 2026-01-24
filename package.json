@@ -47,6 +47,10 @@
       {
         "command": "paperIndex.copyRephrase",
         "title": "Paper Index: Copy Rephrase Suggestion"
+      },
+      {
+        "command": "paperIndex.copyAllResults",
+        "title": "Paper Index: Copy All Results to Clipboard"
       }
     ],
     "configuration": {
