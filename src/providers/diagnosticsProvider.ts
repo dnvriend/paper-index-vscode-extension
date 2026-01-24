@@ -80,8 +80,9 @@ export class DiagnosticsProvider {
   private formatMessage(result: ValidationResult): string {
     const confidence = Math.round(result.confidence * 100);
     const statusLabel = this.formatStatus(result.status);
+    const sourceType = result.paper?.entryType ? ` [${result.paper.entryType}]` : '';
 
-    return `[${statusLabel}] @${result.citation.key} (${confidence}% confidence): ${result.explanation}`;
+    return `[${statusLabel}]${sourceType} @${result.citation.key} (${confidence}% confidence): ${result.explanation}`;
   }
 
   /**

@@ -27,6 +27,9 @@ export function buildValidationPrompt(request: ValidationRequest): string {
   if (request.paperPeerReviewed !== undefined) {
     metadataLines.push(`Peer Reviewed: ${request.paperPeerReviewed ? 'Yes' : 'No'}`);
   }
+  if (request.paperEntryType) {
+    metadataLines.push(`Source Type: ${request.paperEntryType}`);
+  }
 
   // Build extended evidence sections
   const abstractSection = request.paperAbstract ? `\n### Abstract\n${request.paperAbstract}\n` : '';
@@ -74,11 +77,16 @@ If the topic is relevant, actively search the quotes and abstract for evidence t
 
 ### Step 3: Determine Final Status
 
-**"supported"** (confidence 0.8-1.0) - ONLY if you found:
+**Important**: Apply different confidence thresholds based on source type:
+- **paper** (peer-reviewed): Hold to highest standard (0.85+ for supported)
+- **book**: Moderate standard, broader interpretations acceptable (0.75+ for supported)
+- **media** (video/podcast/blog): Most lenient, illustrative use acceptable (0.60+ for supported)
+
+**"supported"** (confidence varies by source type) - ONLY if you found:
 - Direct quotes or abstract text that explicitly state what the paragraph claims
 - Clear, unambiguous evidence supporting the specific claim
 
-**"partial"** (confidence 0.4-0.79) - If you found:
+**"partial"** - If you found:
 - The paper discusses related concepts but doesn't directly make the claimed argument
 - Some aspects of the claim are supported, others are not
 - The connection requires reasonable inference

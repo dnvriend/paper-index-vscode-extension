@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+/** Entry types supported by paper-index-tool */
+export type EntryType = 'paper' | 'book' | 'media';
+
 /**
  * Represents a parsed citation from a Markdown document
  */
@@ -50,6 +53,8 @@ export interface Paper {
   results?: string;
   interpretation?: string;
   claims?: string;
+  /** Entry type from paper-index-tool (paper, book, or media) */
+  entryType?: EntryType;
   quotes?: Quote[];
   peer_reviewed?: boolean;
 }
@@ -177,6 +182,8 @@ export interface ValidationRequest {
   paperResults?: string;
   paperQuestion?: string;
   paperInterpretation?: string;
+  /** Entry type for differentiated threshold handling */
+  paperEntryType?: EntryType;
   /** Keyword search fragments from BM25 query */
   keywordFragments?: Fragment[];
 }

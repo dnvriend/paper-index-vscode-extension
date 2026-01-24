@@ -137,6 +137,7 @@ export class Validator {
         paperResults: paper.results,
         paperQuestion: paper.question,
         paperInterpretation: paper.interpretation,
+        paperEntryType: paper.entryType,
         keywordFragments: combinedFragments,
       });
 

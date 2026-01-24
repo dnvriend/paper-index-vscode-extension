@@ -17,6 +17,22 @@ function formatStatus(status: ValidationStatus): string {
 }
 
 /**
+ * Format entry type for display with threshold info
+ */
+function formatEntryType(entryType: string): string {
+  switch (entryType) {
+    case 'paper':
+      return 'Paper (peer-reviewed, threshold: 85%)';
+    case 'book':
+      return 'Book (threshold: 75%)';
+    case 'media':
+      return 'Media (threshold: 60%)';
+    default:
+      return entryType;
+  }
+}
+
+/**
  * Format a single validation result as Markdown
  */
 function formatSingleResult(result: ValidationResult): string {
@@ -29,6 +45,9 @@ function formatSingleResult(result: ValidationResult): string {
   // Status and confidence
   lines.push(`**Status**: ${formatStatus(result.status)}`);
   lines.push(`**Confidence**: ${Math.round(result.confidence * 100)}%`);
+  if (result.paper?.entryType) {
+    lines.push(`**Source Type**: ${formatEntryType(result.paper.entryType)}`);
+  }
   lines.push('');
 
   // Explanation

@@ -67,6 +67,9 @@ export class HoverProvider implements vscode.HoverProvider {
 
     md.appendMarkdown(`### ${statusIcon} Citation: \`@${result.citation.key}\`\n\n`);
     md.appendMarkdown(`**Status:** ${this.formatStatus(result.status)} (${confidence}%)\n\n`);
+    if (result.paper?.entryType) {
+      md.appendMarkdown(`**Source Type:** ${this.formatEntryType(result.paper.entryType)}\n\n`);
+    }
     md.appendMarkdown(`${result.explanation}\n\n`);
 
     if (result.paper) {
@@ -238,6 +241,22 @@ export class HoverProvider implements vscode.HoverProvider {
         return 'Not Supported';
       default:
         return 'Unknown';
+    }
+  }
+
+  /**
+   * Format entry type for display with threshold info
+   */
+  private formatEntryType(entryType: string): string {
+    switch (entryType) {
+      case 'paper':
+        return '📄 Paper (peer-reviewed, threshold: 85%)';
+      case 'book':
+        return '📚 Book (threshold: 75%)';
+      case 'media':
+        return '🎬 Media (threshold: 60%)';
+      default:
+        return entryType;
     }
   }
 

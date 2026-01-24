@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { readFile } from 'fs/promises';
-import { Paper, Quote, PaperIndexResult, Fragment, SearchResult } from '../types';
+import { Paper, Quote, PaperIndexResult, Fragment, SearchResult, EntryType } from '../types';
 import { getCacheService } from './cacheService';
 import { logger } from './logger';
 
@@ -19,8 +19,6 @@ function hashText(text: string): string {
   return hash.toString(36);
 }
 
-/** Entry types supported by paper-index-tool */
-type EntryType = 'paper' | 'book' | 'media';
 const ENTRY_TYPES: EntryType[] = ['paper', 'book', 'media'];
 
 /**
@@ -57,6 +55,7 @@ export class PaperIndexService {
       try {
         const result = await this.executeCommand([entryType, 'show', entryId, '--format', 'json']);
         const entry = JSON.parse(result) as Paper;
+        entry.entryType = entryType;  // Add entry type
         cache.set(cacheKey, entry);
         return entry;
       } catch {
